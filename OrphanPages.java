@@ -1,5 +1,3 @@
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -17,13 +15,14 @@ import org.apache.hadoop.util.ToolRunner;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
+// >>> Don't Change
 public class OrphanPages extends Configured implements Tool {
-    public static final Log LOG = LogFactory.getLog(OrphanPages.class);
 
     public static void main(String[] args) throws Exception {
         int res = ToolRunner.run(new Configuration(), new OrphanPages(), args);
         System.exit(res);
     }
+// <<< Don't Change
 
     @Override
     public int run(String[] args) throws Exception {
@@ -47,16 +46,26 @@ public class OrphanPages extends Configured implements Tool {
     public static class LinkCountMap extends Mapper<Object, Text, IntWritable, IntWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<IntWritable>, <IntWritable>); // pass this output to reducer
+            String line = value.toString();
+            StringTokenizer t = new StringTokenizer(line, ": ");
+            String page = t.nextToken().trim();
+            context.write(new IntWritable(Integer.parseInt(page)), new IntWritable(0));
+	    while (t.hasMoreTokens()) {
+		String link = t.nextToken().trim();
+                context.write(new IntWritable(Integer.parseInt(link)), new IntWritable(1));
+	    }
+            
         }
     }
 
     public static class OrphanPageReduce extends Reducer<IntWritable, IntWritable, IntWritable, NullWritable> {
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<IntWritable>, <NullWritable>); // print as final output
+            int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            if (sum == 0) context.write(key, NullWritable.get());
         }
     }
 }

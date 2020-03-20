@@ -86,16 +86,42 @@ public class TitleCount extends Configured implements Tool {
 
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<Text>, <IntWritable>); // pass this output to reducer
+        List<String> stopWords;
+        String delimiters;
+
+        @Override
+        protected void setup(Context context) throws IOException,InterruptedException {
+
+            Configuration conf = context.getConfiguration();
+
+            String stopWordsPath = conf.get("stopwords");
+            String delimitersPath = conf.get("delimiters");
+
+            this.stopWords = Arrays.asList(readHDFSFile(stopWordsPath, conf).split("\n"));
+            this.delimiters = readHDFSFile(delimitersPath, conf);
+        }
+
+        @Override
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            String line = value.toString();
+            StringTokenizer tokenizer = new StringTokenizer(line, delimiters);
+            while (tokenizer.hasMoreTokens()){
+                String nextToken = tokenizer.nextToken().trim().toLowerCase();
+                if(!stopWords.contains(nextToken)){
+                    context.write(new Text(nextToken), new IntWritable(1));
+                }
+            }
         }
     }
-
     public static class TitleCountReduce extends Reducer<Text, IntWritable, Text, IntWritable> {
         @Override
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<Text>, <NullWritable>); // print as final output
+           int sum = 0;
+            for(IntWritable value : values)
+            {
+                sum += value.get();
+            }
+            context.write(key, new IntWritable(sum));
         }
     }
 }

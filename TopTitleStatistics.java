@@ -28,9 +28,8 @@ import java.util.List;
 import java.util.StringTokenizer;
 import java.util.TreeSet;
 
+// Don't Change >>>
 public class TopTitleStatistics extends Configured implements Tool {
-    public static final Log LOG = LogFactory.getLog(TopTitleStatistics.class);
-
     public static void main(String[] args) throws Exception {
         int res = ToolRunner.run(new Configuration(), new TopTitleStatistics(), args);
         System.exit(res);
@@ -106,6 +105,7 @@ public class TopTitleStatistics extends Configured implements Tool {
             set(texts);
         }
     }
+// <<< Don't Change
 
     public static class TitleCountMap extends Mapper<Object, Text, Text, IntWritable> {
         List<String> stopWords;
@@ -126,53 +126,113 @@ public class TopTitleStatistics extends Configured implements Tool {
 
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<Text>, <IntWritable>); // pass this output to reducer
+            // TODO
+            String line = value.toString();
+            StringTokenizer tokenizer = new StringTokenizer(line, this.delimiters);
+            while (tokenizer.hasMoreTokens()) {
+                String nextToken = tokenizer.nextToken().trim().toLowerCase();
+                if (!this.stopWords.contains(nextToken)) {
+                    context.write(new Text(nextToken), new IntWritable(1));
+                }
+            }
         }
     }
 
     public static class TitleCountReduce extends Reducer<Text, IntWritable, Text, IntWritable> {
         @Override
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            //TODO
-            //context.write(<Text>, <IntWritable>); // pass this output to TopTitlesStatMap mapper
+            // TODO
+            int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            context.write(key, new IntWritable(sum));
         }
     }
 
     public static class TopTitlesStatMap extends Mapper<Text, Text, NullWritable, TextArrayWritable> {
-        //TODO
-
+        Integer N;
+        // TODO
+        private TreeSet<Pair<Integer, String>> countToTitleMap = new TreeSet<Pair<Integer, String>>();
+        
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
             Configuration conf = context.getConfiguration();
+            this.N = conf.getInt("N", 10);
         }
 
         @Override
         public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
-            //TODO
+            // TODO
+            Integer count = Integer.parseInt(value.toString());
+            String title = key.toString();
+            
+            countToTitleMap.add(new Pair<Integer, String>(count, title));
+            if (countToTitleMap.size() > this.N) {
+                countToTitleMap.remove(countToTitleMap.first());
+            }
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-            //TODO
-            //Cleanup operation starts after all mappers are finished
-            //context.write(<NullWritable>, <TextArrayWritable>); // pass this output to reducer
+            // TODO
+            for (Pair<Integer, String> item : countToTitleMap) {
+                String[] strings = {item.second, item.first.toString()};
+                TextArrayWritable val = new TextArrayWritable(strings);
+                context.write(NullWritable.get(), val);
+            }
         }
     }
 
     public static class TopTitlesStatReduce extends Reducer<NullWritable, TextArrayWritable, Text, IntWritable> {
-        //TODO
+        Integer N;
+        // TODO
+        private TreeSet<Pair<Integer, String>> countToTitleMap = new TreeSet<Pair<Integer, String>>();
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
             Configuration conf = context.getConfiguration();
+            this.N = conf.getInt("N", 10);
         }
 
         @Override
         public void reduce(NullWritable key, Iterable<TextArrayWritable> values, Context context) throws IOException, InterruptedException {
             Integer sum, mean, max, min, var;
-            //TODO
 
+            // TODO
+            for (TextArrayWritable val : values) {
+                Text[] pair = (Text[]) val.toArray();
+                
+                String title = pair[0].toString();
+                Integer count = Integer.parseInt(pair[1].toString());
+                
+                countToTitleMap.add(new Pair<Integer, String>(count, title));
+                if (countToTitleMap.size() > this.N) {
+                    countToTitleMap.remove(countToTitleMap.first());
+                }
+            }
+
+            // Statistics
+            sum = mean = max = min = var = 0;
+            for (Pair<Integer, String> item : countToTitleMap) {
+                if (sum == 0) { // if this is a first element
+                    max = item.first;
+                    min = item.first;
+                } else {
+                    if (max < item.first)
+                        max = item.first;
+                    if (min > item.first)
+                        min = item.first;
+                }
+                sum += item.first;
+            }
+            mean = sum / this.N;
+            for (Pair<Integer, String> item : countToTitleMap) {
+                Integer count = item.first;
+                var += (count - mean) * (count - mean);
+            }
+            var = var / this.N;
+                        
             context.write(new Text("Mean"), new IntWritable(mean));
             context.write(new Text("Sum"), new IntWritable(sum));
             context.write(new Text("Min"), new IntWritable(min));
@@ -183,7 +243,7 @@ public class TopTitleStatistics extends Configured implements Tool {
 
 }
 
-
+// >>> Don't Change
 class Pair<A extends Comparable<? super A>,
         B extends Comparable<? super B>>
         implements Comparable<Pair<A, B>> {
@@ -236,3 +296,4 @@ class Pair<A extends Comparable<? super A>,
         return "(" + first + ", " + second + ')';
     }
 }
+// <<< Don't Change
